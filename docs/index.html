@@ -222,12 +222,73 @@ function convertCoordinate(
  * RGB変換
  * ============================================================
  *
- * LAS RGB
+ * loaders.glから返ってくる値を確認して、
+ * deck.gl用の 0〜255 に変換する。
  *
- * 16bit
- *   ↓
- * 8bit
+ * 対応:
  *
+ *   0〜1
+ *   0〜255
+ *   0〜65535
+ *
+ * ============================================================
+ */
+
+function convertColorValue(value) {
+
+  if (
+    value === undefined ||
+    value === null ||
+    Number.isNaN(value)
+  ) {
+
+    return 0;
+
+  }
+
+
+  /*
+   * 0〜1 のnormalized値
+   */
+
+  if (value >= 0 && value <= 1) {
+
+    return Math.round(
+
+      value * 255
+
+    );
+
+  }
+
+
+  /*
+   * 8bit RGB
+   */
+
+  if (value <= 255) {
+
+    return Math.round(value);
+
+  }
+
+
+  /*
+   * 16bit RGB
+   */
+
+  return Math.round(
+
+    value / 65535 * 255
+
+  );
+
+}
+
+
+/*
+ * ============================================================
+ * RGB
  * ============================================================
  */
 
@@ -241,16 +302,28 @@ function convertColor(
 
   return [
 
-    Math.round(
-      r / 65535 * 255
+    Math.max(
+      0,
+      Math.min(
+        255,
+        convertColorValue(r)
+      )
     ),
 
-    Math.round(
-      g / 65535 * 255
+    Math.max(
+      0,
+      Math.min(
+        255,
+        convertColorValue(g)
+      )
     ),
 
-    Math.round(
-      b / 65535 * 255
+    Math.max(
+      0,
+      Math.min(
+        255,
+        convertColorValue(b)
+      )
     )
 
   ];
@@ -308,12 +381,16 @@ async function loadLAS() {
    * ==========================================================
    */
 
-  const positions =
+  const positionAttribute =
 
     data
       .attributes
-      .POSITION
-      .value;
+      .POSITION;
+
+
+  const positions =
+
+    positionAttribute.value;
 
 
   /*
@@ -322,12 +399,16 @@ async function loadLAS() {
    * ==========================================================
    */
 
-  const colors =
+  const colorAttribute =
 
     data
       .attributes
-      .COLOR_0
-      ?.value;
+      .COLOR_0;
+
+
+  const colors =
+
+    colorAttribute?.value;
 
 
   /*
@@ -354,50 +435,94 @@ async function loadLAS() {
 
   /*
    * ==========================================================
-   * RGB確認
+   * RGB情報確認
    * ==========================================================
    */
+
+  console.log(
+
+    "COLOR_0:",
+
+    colorAttribute
+
+  );
+
+
+  console.log(
+
+    "COLOR_0 size:",
+
+    colorAttribute?.size
+
+  );
+
+
+  console.log(
+
+    "COLOR_0 type:",
+
+    colors?.constructor?.name
+
+  );
+
 
   if (colors) {
 
     console.log(
 
-      "COLOR_0:",
+      "First raw color values:",
 
-      data.attributes.COLOR_0
+      Array.from(
 
-    );
+        colors.slice(
 
+          0,
+          Math.min(
 
-    console.log(
+            12,
+            colors.length
 
-      "First raw RGB:",
+          )
 
-      [
+        )
 
-        colors[0],
-
-        colors[1],
-
-        colors[2],
-
-        colors[3]
-
-      ]
+      )
 
     );
 
   }
 
-  else {
 
-    console.log(
+  /*
+   * ==========================================================
+   * RGBチャンネル数
+   * ==========================================================
+   *
+   * 通常:
+   *
+   *   size = 3
+   *       R G B
+   *
+   * または
+   *
+   *   size = 4
+   *       R G B A
+   *
+   * ==========================================================
+   */
 
-      "COLOR_0: not found"
+  const colorSize =
 
-    );
+    colorAttribute?.size || 3;
 
-  }
+
+  console.log(
+
+    "Using color size:",
+
+    colorSize
+
+  );
 
 
   /*
@@ -433,7 +558,9 @@ async function loadLAS() {
 
 
     /*
+     * ========================================================
      * LAS座標
+     * ========================================================
      */
 
     const x =
@@ -464,7 +591,9 @@ async function loadLAS() {
 
 
     /*
+     * ========================================================
      * WGS84
+     * ========================================================
      */
 
     const position =
@@ -495,23 +624,79 @@ async function loadLAS() {
 
     if (colors) {
 
+
+      /*
+       * colorSizeに応じて
+       * RGBの位置を取得
+       */
+
+      const colorIndex =
+
+        i * colorSize;
+
+
+      const r =
+
+        colors[colorIndex];
+
+
+      const g =
+
+        colors[colorIndex + 1];
+
+
+      const b =
+
+        colors[colorIndex + 2];
+
+
       color =
 
         convertColor(
 
-          colors[i * 4],
-
-          colors[i * 4 + 1],
-
-          colors[i * 4 + 2]
+          r,
+          g,
+          b
 
         );
+
+
+      /*
+       * 最初の点だけ確認
+       */
+
+      if (i === 0) {
+
+        console.log(
+
+          "First raw RGB:",
+
+          [
+            r,
+            g,
+            b
+          ]
+
+        );
+
+
+        console.log(
+
+          "First converted RGB:",
+
+          color
+
+        );
+
+      }
 
     }
 
 
     /*
+     * ========================================================
      * Point
+     * ========================================================
      */
 
     points[i] = {
@@ -619,10 +804,6 @@ const map =
          * ----------------------------------------------------
          * 産総研 陸地統合DEM
          * ----------------------------------------------------
-         *
-         * Terrain RGB
-         *
-         * ----------------------------------------------------
          */
 
         "terrain": {
@@ -722,10 +903,6 @@ const map =
       INITIAL_ZOOM,
 
 
-    /*
-     * 3D terrainを見るため傾ける
-     */
-
     pitch:
       60,
 
@@ -772,12 +949,6 @@ map.on(
 
       );
 
-
-      /*
-       * ======================================================
-       * Terrain確認
-       * ======================================================
-       */
 
       console.log(
 
