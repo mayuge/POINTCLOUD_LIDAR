@@ -15,7 +15,7 @@
   <!-- maplibre-gl-lidar -->
   <link
     rel="stylesheet"
-    href="https://unpkg.com/maplibre-gl-lidar/dist/style.css"
+    href="https://unpkg.com/maplibre-gl-lidar@0.16.2/dist/style.css"
   >
 
   <style>
@@ -39,49 +39,28 @@
 
 <script type="module">
 
-  import maplibregl from
-    "https://unpkg.com/maplibre-gl@6.7.0/dist/maplibre-gl.mjs";
+  import maplibregl
+    from "https://cdn.jsdelivr.net/npm/maplibre-gl@6.7.0/+esm";
 
-  import {
-    LidarControl
-  } from
-    "https://unpkg.com/maplibre-gl-lidar/dist/maplibre-gl-lidar.mjs";
+  import { LidarControl }
+    from "https://cdn.jsdelivr.net/npm/maplibre-gl-lidar@0.16.2/+esm";
 
-
-  /*
-   * ----------------------------------------
-   * MapLibre
-   * ----------------------------------------
-   */
 
   const map = new maplibregl.Map({
-
     container: "map",
 
     style:
-      "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+      "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
 
-    center: [
-      137.0,
-      35.0
-    ],
+    center: [137, 36],
 
     zoom: 10,
 
     pitch: 60,
 
-    bearing: 0,
-
     maxPitch: 85
-
   });
 
-
-  /*
-   * ----------------------------------------
-   * LiDAR
-   * ----------------------------------------
-   */
 
   map.on("load", () => {
 
@@ -106,34 +85,18 @@
     );
 
 
-    /*
-     * 直下の sy.las を読み込む
-     */
+    lidarControl.on("load", () => {
 
-    lidarControl.loadPointCloud(
-      "./sy.las"
-    );
-
-
-    /*
-     * 読み込み完了
-     */
-
-    lidarControl.on("load", (event) => {
-
-      console.log(
-        "LiDAR loaded:",
-        event.pointCloud
-      );
-
-      /*
-       * 点群の範囲へ移動
-       */
+      console.log("LiDAR loaded");
 
       lidarControl.flyToPointCloud();
 
     });
 
+
+    lidarControl.loadPointCloud(
+      "./sy.las"
+    );
 
   });
 
