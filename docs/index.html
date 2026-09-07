@@ -1,22 +1,17 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>LiDAR Viewer</title>
+  <title>LAS Point Cloud Viewer</title>
 
-  <!-- MapLibre GL JS 6.7.0 -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/maplibre-gl@6.7.0/dist/maplibre-gl.css"
-  >
+  <!-- deck.gl -->
+  <script src="https://unpkg.com/deck.gl@9.3.6/dist.min.js"></script>
 
-  <!-- maplibre-gl-lidar -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/maplibre-gl-lidar@0.16.2/dist/maplibre-gl-lidar.css"
-  >
+  <!-- loaders.gl LAS -->
+  <script src="https://unpkg.com/@loaders.gl/las@4.3.3/dist/dist.min.js"></script>
 
   <style>
     html,
@@ -24,9 +19,11 @@
       margin: 0;
       width: 100%;
       height: 100%;
+      overflow: hidden;
+      background: #111;
     }
 
-    #map {
+    #app {
       width: 100%;
       height: 100%;
     }
@@ -35,105 +32,130 @@
 
 <body>
 
-<div id="map"></div>
+<div id="app"></div>
 
-<script type="module">
-
-  /*
-   * ----------------------------------------
-   * MapLibre GL JS
-   * ----------------------------------------
-   */
-
-  import * as maplibregl
-    from "https://unpkg.com/maplibre-gl@6.7.0/dist/maplibre-gl.mjs";
-
+<script>
 
   /*
    * ----------------------------------------
-   * maplibre-gl-lidar
-   *
-   * deck.gl 9.3.2 に固定
+   * LAS Loader
    * ----------------------------------------
    */
 
-  import { LidarControl }
-    from "https://esm.sh/maplibre-gl-lidar@0.16.2?deps=@deck.gl/core@9.3.2,@deck.gl/extensions@9.3.2,@deck.gl/layers@9.3.2,@deck.gl/mapbox@9.3.2";
+  const LASLoader = loaders.LASLoader;
 
 
   /*
    * ----------------------------------------
-   * Map
+   * DeckGL
    * ----------------------------------------
    */
 
-  const map = new maplibregl.Map({
+  const deckgl = new deck.DeckGL({
 
-    container: "map",
-
-    style:
-      "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-
-    center: [137, 36],
-
-    zoom: 10,
-
-    pitch: 60,
-
-    maxPitch: 85
-
-  });
-
-
-  /*
-   * ----------------------------------------
-   * LiDAR
-   * ----------------------------------------
-   */
-
-  map.on("load", () => {
-
-    const lidarControl = new LidarControl({
-
-      title: "LiDAR",
-
-      collapsed: false,
-
-      pointSize: 2,
-
-      colorScheme: "elevation",
-
-      pickable: true
-
-    });
-
-
-    map.addControl(
-      lidarControl,
-      "top-right"
-    );
-
-
-    lidarControl.on("load", () => {
-
-      console.log("LiDAR loaded");
-
-      lidarControl.flyToPointCloud();
-
-    });
-
+    container: "app",
 
     /*
-     * sy.las
-     *
-     * index.html と同じディレクトリ
+     * 最初は適当な視点
      */
+    initialViewState: {
 
-    lidarControl.loadPointCloud("./sy.las");
+      longitude: 137,
+
+      latitude: 36,
+
+      zoom: 15,
+
+      pitch: 60,
+
+      bearing: 0
+
+    },
+
+    controller: true,
+
+    /*
+     * ツールチップ
+     */
+    getTooltip: ({ object }) => {
+
+      if (!object) {
+        return null;
+      }
+
+      return JSON.stringify(object);
+
+    },
+
+    layers: [
+
+      new deck.PointCloudLayer({
+
+        id: "las-point-cloud",
+
+        /*
+         * GitHub Pages上のsy.las
+         */
+        data: "./sy.las",
+
+        /*
+         * LAS Loader
+         */
+        loaders: [
+          LASLoader
+        ],
+
+        /*
+         * 点の大きさ
+         */
+        pointSize: 2,
+
+        /*
+         * 色
+         */
+        getColor: [255, 255, 255],
+
+        /*
+         * 法線
+         */
+        getNormal: [0, 0, 1],
+
+        /*
+         * クリック可能
+         */
+        pickable: true,
+
+        /*
+         * LAS読み込み完了
+         */
+        onDataLoad: (data) => {
+
+          console.log("LAS loaded");
+
+          console.log(data);
+
+        },
+
+        /*
+         * エラー
+         */
+        onError: (error) => {
+
+          console.error(
+            "LAS loading error:",
+            error
+          );
+
+        }
+
+      })
+
+    ]
 
   });
 
 </script>
 
 </body>
+
 </html>
