@@ -6,7 +6,7 @@
 
   <title>LiDAR Viewer</title>
 
-  <!-- MapLibre -->
+  <!-- MapLibre GL JS 6.7.0 -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/maplibre-gl@6.7.0/dist/maplibre-gl.css"
@@ -15,7 +15,7 @@
   <!-- maplibre-gl-lidar -->
   <link
     rel="stylesheet"
-    href="https://unpkg.com/maplibre-gl-lidar@0.16.2/dist/style.css"
+    href="https://unpkg.com/maplibre-gl-lidar@0.16.2/dist/maplibre-gl-lidar.css"
   >
 
   <style>
@@ -41,12 +41,33 @@
 
 import * as maplibregl
   from "https://unpkg.com/maplibre-gl@6.7.0/dist/maplibre-gl.mjs";
+   * ----------------------------------------
+   */
+
+  import * as maplibregl
+    from "https://unpkg.com/maplibre-gl@6.7.0/dist/maplibre-gl.mjs";
+
+
+  /*
+   * ----------------------------------------
+   * maplibre-gl-lidar
+   *
+   * deck.gl 9.3.2 に固定
+   * ----------------------------------------
+   */
 
   import { LidarControl }
-    from "https://cdn.jsdelivr.net/npm/maplibre-gl-lidar@0.16.2/+esm";
+    from "https://esm.sh/maplibre-gl-lidar@0.16.2?deps=@deck.gl/core@9.3.2,@deck.gl/extensions@9.3.2,@deck.gl/layers@9.3.2,@deck.gl/mapbox@9.3.2";
 
+
+  /*
+   * ----------------------------------------
+   * Map
+   * ----------------------------------------
+   */
 
   const map = new maplibregl.Map({
+
     container: "map",
 
     style:
@@ -59,8 +80,15 @@ import * as maplibregl
     pitch: 60,
 
     maxPitch: 85
+
   });
 
+
+  /*
+   * ----------------------------------------
+   * LiDAR
+   * ----------------------------------------
+   */
 
   map.on("load", () => {
 
@@ -94,9 +122,13 @@ import * as maplibregl
     });
 
 
-    lidarControl.loadPointCloud(
-      "./sy.las"
-    );
+    /*
+     * sy.las
+     *
+     * index.html と同じディレクトリ
+     */
+
+    lidarControl.loadPointCloud("./sy.las");
 
   });
 
