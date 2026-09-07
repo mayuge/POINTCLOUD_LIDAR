@@ -113,7 +113,8 @@
 
 <div id="info">
 
-  国土地理院「全国最新写真（シームレス）」＋ AWS Terrain ＋ LAS
+  国土地理院「全国最新写真（シームレス）」＋
+  産総研「陸地統合DEM」＋ LAS
 
 </div>
 
@@ -221,9 +222,11 @@ function convertCoordinate(
  * RGB変換
  * ============================================================
  *
- * LASのRGBは16bit。
+ * LAS RGB
  *
- * deck.gl用に8bitへ変換。
+ * 16bit
+ *   ↓
+ * 8bit
  *
  * ============================================================
  */
@@ -264,7 +267,9 @@ function convertColor(
 async function loadLAS() {
 
   console.log(
+
     "LAS loading..."
+
   );
 
 
@@ -284,12 +289,16 @@ async function loadLAS() {
 
 
   console.log(
+
     "LAS loaded"
+
   );
 
 
   console.log(
+
     data
+
   );
 
 
@@ -470,7 +479,9 @@ async function loadLAS() {
 
 
     /*
+     * ========================================================
      * RGB
+     * ========================================================
      */
 
     let color = [
@@ -539,13 +550,13 @@ async function loadLAS() {
  * MapLibre
  * ============================================================
  *
- * 背景
+ * Background
  *
  *   GSI seamlessphoto
  *
- * 地形
+ * Terrain
  *
- *   AWS Terrain Tiles
+ *   AIST Integrated Land DEM
  *
  * ============================================================
  */
@@ -606,22 +617,22 @@ const map =
 
         /*
          * ----------------------------------------------------
-         * AWS Terrain Tiles
+         * 産総研 陸地統合DEM
          * ----------------------------------------------------
          *
-         * Terrarium形式
+         * Terrain RGB
          *
          * ----------------------------------------------------
          */
 
-        "aws-terrain": {
+        "terrain": {
 
           type:
             "raster-dem",
 
           tiles: [
 
-            "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
+            "https://gbank.gsj.jp/seamless/elev/terrainRGB/land/{z}/{y}/{x}.png"
 
           ],
 
@@ -629,13 +640,13 @@ const map =
             256,
 
           encoding:
-            "terrarium",
+            "mapbox",
 
-          minzoom:
-            0,
+          attribution:
 
-          maxzoom:
-            15
+            "<a href=\"https://tiles.gsj.jp/tiles/elev/tiles.html\" target=\"_blank\">" +
+            "産総研 陸地統合DEM" +
+            "</a>"
 
         }
 
@@ -649,12 +660,6 @@ const map =
        */
 
       layers: [
-
-        /*
-         * ----------------------------------------------------
-         * GSI航空写真
-         * ----------------------------------------------------
-         */
 
         {
 
@@ -676,7 +681,24 @@ const map =
 
         }
 
-      ]
+      ],
+
+
+      /*
+       * ======================================================
+       * Terrain
+       * ======================================================
+       */
+
+      terrain: {
+
+        source:
+          "terrain",
+
+        exaggeration:
+          1
+
+      }
 
     },
 
@@ -701,7 +723,7 @@ const map =
 
 
     /*
-     * 3D地形を確認するため少し傾ける
+     * 3D terrainを見るため傾ける
      */
 
     pitch:
@@ -716,7 +738,7 @@ const map =
 
 /*
  * ============================================================
- * MapLibre Navigation
+ * Navigation Control
  * ============================================================
  */
 
@@ -731,7 +753,7 @@ map.addControl(
 
 /*
  * ============================================================
- * MapLibre load
+ * MapLibre Load
  * ============================================================
  */
 
@@ -753,24 +775,13 @@ map.on(
 
       /*
        * ======================================================
-       * AWS Terrain
+       * Terrain確認
        * ======================================================
        */
 
-      map.setTerrain({
-
-        source:
-          "aws-terrain",
-
-        exaggeration:
-          1
-
-      });
-
-
       console.log(
 
-        "AWS terrain enabled"
+        "AIST terrain enabled"
 
       );
 
