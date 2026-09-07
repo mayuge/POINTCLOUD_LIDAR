@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="ja">
 
@@ -8,34 +7,59 @@
 
   <title>LAS Point Cloud Viewer</title>
 
-  <!-- deck.gl -->
+  <!-- =========================================================
+       deck.gl
+       ========================================================= -->
+
   <script src="https://unpkg.com/deck.gl@9.3.6/dist.min.js"></script>
 
-  <!-- loaders.gl LAS -->
+
+  <!-- =========================================================
+       loaders.gl LAS
+       ========================================================= -->
+
   <script src="https://unpkg.com/@loaders.gl/las@4.3.3/dist/dist.min.js"></script>
 
-  <!-- proj4 -->
+
+  <!-- =========================================================
+       proj4
+       ========================================================= -->
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.15.0/proj4.js"></script>
 
+
   <style>
+
     html,
     body {
+
       margin: 0;
+
       width: 100%;
       height: 100%;
+
       overflow: hidden;
+
       background: #111;
+
     }
+
 
     #app {
+
       width: 100%;
       height: 100%;
+
     }
 
+
     #info {
+
       position: absolute;
+
       left: 10px;
       bottom: 10px;
+
       z-index: 10;
 
       padding: 6px 10px;
@@ -43,19 +67,28 @@
       background: rgba(255, 255, 255, 0.85);
 
       font-family: sans-serif;
+
       font-size: 12px;
 
       pointer-events: none;
+
     }
+
   </style>
+
 </head>
+
 
 <body>
 
+
 <div id="app"></div>
 
+
 <div id="info">
+
   国土地理院「全国最新写真（シームレス）」＋ LAS
+
 </div>
 
 
@@ -77,10 +110,12 @@
  * WGS84
  * EPSG:4326
  *
+ * ============================================================
  */
 
 
 proj4.defs(
+
   "EPSG:6677",
 
   "+proj=tmerc " +
@@ -92,6 +127,7 @@ proj4.defs(
   "+ellps=GRS80 " +
   "+units=m " +
   "+no_defs"
+
 );
 
 
@@ -103,18 +139,29 @@ proj4.defs(
 
 function convertCoordinate(x, y, z) {
 
-  const [longitude, latitude] =
+  const [
+    longitude,
+    latitude
+  ] =
     proj4(
+
       "EPSG:6677",
+
       "EPSG:4326",
+
       [x, y]
+
     );
 
+
   return [
+
     longitude,
     latitude,
     z
+
   ];
+
 }
 
 
@@ -131,71 +178,160 @@ async function loadLAS() {
 
   const data =
     await loaders.load(
+
       "./sy.las",
+
       loaders.LASLoader
+
     );
 
 
   console.log("LAS loaded");
+
+
   console.log(data);
 
+
+  /*
+   * 座標
+   */
 
   const positions =
     data.attributes.POSITION.value;
 
 
+  /*
+   * RGB
+   */
+
   const colors =
     data.attributes.COLOR_0?.value;
 
+
+  /*
+   * 点数
+   */
 
   const pointCount =
     data.header.vertexCount;
 
 
   console.log(
+
     "Point count:",
+
     pointCount
+
   );
 
+
+  /*
+   * RGB確認
+   */
+
+  if (colors) {
+
+    console.log(
+
+      "COLOR_0:",
+
+      data.attributes.COLOR_0
+
+    );
+
+
+    console.log(
+
+      "First RGB:",
+
+      [
+
+        colors[0],
+        colors[1],
+        colors[2],
+        colors[3]
+
+      ]
+
+    );
+
+  } else {
+
+    console.log(
+
+      "COLOR_0: not found"
+
+    );
+
+  }
+
+
+  /*
+   * PointCloudLayer用データ
+   */
 
   const points =
     new Array(pointCount);
 
 
   /*
-   * ----------------------------------------------------------
+   * ==========================================================
    * 座標変換
-   * ----------------------------------------------------------
+   * ==========================================================
    */
 
   for (let i = 0; i < pointCount; i++) {
 
+
+    /*
+     * LAS座標
+     */
+
     const x =
       positions[i * 3];
 
+
     const y =
       positions[i * 3 + 1];
+
 
     const z =
       positions[i * 3 + 2];
 
 
+    /*
+     * WGS84へ変換
+     */
+
     const position =
       convertCoordinate(
+
         x,
         y,
         z
+
       );
 
 
     /*
+     * ========================================================
      * RGB
+     * ========================================================
+     *
+     * LASのRGBは16bitの場合がある。
+     *
+     * まず現在の値を確認するため、
+     * ここでは単純に取得する。
+     *
+     * ========================================================
      */
 
     let color = [
+
       255,
       255,
       255
+
     ];
 
 
@@ -214,6 +350,10 @@ async function loadLAS() {
     }
 
 
+    /*
+     * Point
+     */
+
     points[i] = {
 
       position,
@@ -225,39 +365,50 @@ async function loadLAS() {
   }
 
 
+  /*
+   * 最初の点を確認
+   */
+
   console.log(
+
     "First converted point:",
+
     points[0]
+
   );
 
 
   return points;
+
 }
 
 
 /*
  * ============================================================
- * 地理院シームレス画像
+ * 地理院シームレス空中写真
  * ============================================================
  *
- * 国土地理院
+ * XYZ
  *
  * https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/
  *
+ * ============================================================
  */
 
-
 const gsiPhotoLayer =
+
   new deck.TileLayer({
 
-    id: "gsi-seamless-photo",
+    id:
+      "gsi-seamless-photo",
 
 
     /*
-     * 地理院シームレス空中写真
+     * GSI XYZタイル
      */
 
     data:
+
       "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg",
 
 
@@ -265,62 +416,85 @@ const gsiPhotoLayer =
      * ズーム範囲
      */
 
-    minZoom: 2,
+    minZoom:
+      2,
 
-    maxZoom: 18,
+    maxZoom:
+      18,
 
 
     /*
      * タイルサイズ
      */
 
-    tileSize: 256,
+    tileSize:
+      256,
 
 
     /*
-     * TileLayer
+     * タイル描画
      */
 
-    renderSubLayers: tile => {
+    renderSubLayers:
 
-      const {
-        bbox,
-        data
-      } = tile;
+      tile => {
+
+        const {
+
+          bbox,
+          data
+
+        } = tile;
 
 
-      if (!data) {
-        return null;
+        if (!data) {
+
+          return null;
+
+        }
+
+
+        return new deck.BitmapLayer({
+
+          id:
+
+            `${tile.id}-bitmap`,
+
+
+          /*
+           * 画像
+           */
+
+          image:
+
+            data,
+
+
+          /*
+           * タイルの地理的範囲
+           */
+
+          bounds: [
+
+            bbox.west,
+            bbox.south,
+
+            bbox.east,
+            bbox.north
+
+          ],
+
+
+          /*
+           * 不透明度
+           */
+
+          opacity:
+            1
+
+        });
+
       }
-
-
-      return new deck.BitmapLayer({
-
-        id:
-          `${tile.id}-bitmap`,
-
-
-        image:
-          data,
-
-
-        bounds: [
-
-          bbox.west,
-          bbox.south,
-
-          bbox.east,
-          bbox.north
-
-        ],
-
-
-        opacity:
-          1
-
-      });
-
-    }
 
   });
 
@@ -333,15 +507,28 @@ const gsiPhotoLayer =
 
 async function createPointCloudLayer() {
 
+
+  /*
+   * LAS読み込み
+   */
+
   const points =
     await loadLAS();
 
+
+  /*
+   * PointCloudLayer
+   */
 
   return new deck.PointCloudLayer({
 
     id:
       "las-point-cloud",
 
+
+    /*
+     * データ
+     */
 
     data:
       points,
@@ -352,6 +539,7 @@ async function createPointCloudLayer() {
      */
 
     getPosition:
+
       d => d.position,
 
 
@@ -360,6 +548,7 @@ async function createPointCloudLayer() {
      */
 
     getColor:
+
       d => d.color,
 
 
@@ -368,6 +557,7 @@ async function createPointCloudLayer() {
      */
 
     getNormal:
+
       [0, 0, 1],
 
 
@@ -392,10 +582,13 @@ async function createPointCloudLayer() {
      */
 
     getTooltip:
+
       ({ object }) => {
 
         if (!object) {
+
           return null;
+
         }
 
 
@@ -420,6 +613,7 @@ async function createPointCloudLayer() {
       }
 
   });
+
 }
 
 
@@ -432,11 +626,21 @@ async function createPointCloudLayer() {
 async function main() {
 
 
+  console.log(
+
+    "Viewer starting..."
+
+  );
+
+
   /*
+   * ==========================================================
    * LAS
+   * ==========================================================
    */
 
   const pointCloudLayer =
+
     await createPointCloudLayer();
 
 
@@ -448,12 +652,21 @@ async function main() {
 
   new deck.DeckGL({
 
+    /*
+     * コンテナ
+     */
+
     container:
       "app",
 
 
     /*
+     * ========================================================
+     * 初期表示位置
+     * ========================================================
+     *
      * Google Mapsで確認した座標
+     *
      */
 
     initialViewState: {
@@ -467,8 +680,12 @@ async function main() {
       zoom:
         18,
 
+      /*
+       * まずは真上から確認
+       */
+
       pitch:
-        60,
+        0,
 
       bearing:
         0
@@ -485,16 +702,20 @@ async function main() {
 
 
     /*
+     * ========================================================
      * レイヤー
+     * ========================================================
      *
      * 下
-     * ↓
-     * 地理院写真
+     *
+     *   GSI航空写真
      *
      * ↓
      *
-     * LAS点群
-     * ↑
+     *   LAS点群
+     *
+     * 上
+     *
      */
 
     layers: [
@@ -507,6 +728,7 @@ async function main() {
 
   });
 
+
 }
 
 
@@ -516,17 +738,28 @@ async function main() {
  * ============================================================
  */
 
-main().catch(error => {
+main()
 
-  console.error(
-    "Viewer error:",
-    error
+  .catch(
+
+    error => {
+
+      console.error(
+
+        "Viewer error:",
+
+        error
+
+      );
+
+    }
+
   );
 
-});
 
 </script>
 
+
 </body>
+
 </html>
-```
