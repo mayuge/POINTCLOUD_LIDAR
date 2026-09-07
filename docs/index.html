@@ -13,6 +13,9 @@
   <!-- loaders.gl LAS -->
   <script src="https://unpkg.com/@loaders.gl/las@4.3.3/dist/dist.min.js"></script>
 
+  <!-- proj4 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.15.0/proj4.js"></script>
+
   <style>
     html,
     body {
@@ -37,125 +40,388 @@
 <script>
 
   /*
-   * ----------------------------------------
-   * LAS Loader
-   * ----------------------------------------
+   * ============================================================
+   * 座標系
+   * ============================================================
+   *
+   * LAS:
+   *   JGD2011 / Japan Plane Rectangular CS IX
+   *   EPSG:6677
+   *
+   * Google Maps:
+   *   WGS84
+   *   EPSG:4326
+   *
+   * LASの座標値は
+   *
+   *   X = Easting
+   *   Y = Northing
+   *
+   * として扱う。
+   *
    */
 
-  const LASLoader = loaders.LASLoader;
+
+  proj4.defs(
+    "EPSG:6677",
+
+    "+proj=tmerc " +
+    "+lat_0=36 " +
+    "+lon_0=139.8333333333333 " +
+    "+k=0.9999 " +
+    "+x_0=0 " +
+    "+y_0=0 " +
+    "+ellps=GRS80 " +
+    "+units=m " +
+    "+no_defs"
+  );
 
 
   /*
-   * ----------------------------------------
-   * DeckGL
-   * ----------------------------------------
+   * ============================================================
+   * LAS座標 → WGS84
+   * ============================================================
    */
 
-  const deckgl = new deck.DeckGL({
-
-    container: "app",
+  function convertCoordinate(x, y, z) {
 
     /*
-     * 最初は適当な視点
+     * EPSG:6677の座標として
+     *
+     * [Easting, Northing]
+     *
+     * を渡す
      */
-    initialViewState: {
 
-      longitude: 137,
+    const [longitude, latitude] =
+      proj4(
+        "EPSG:6677",
+        "EPSG:4326",
+        [x, y]
+      );
 
-      latitude: 36,
 
-      zoom: 15,
+    return [
+      longitude,
+      latitude,
+      z
+    ];
+  }
 
-      pitch: 60,
 
-      bearing: 0
+  /*
+   * ============================================================
+   * LAS読み込み
+   * ============================================================
+   */
 
-    },
+  async function loadLAS() {
 
-    controller: true,
+    console.log("LAS loading...");
+
+
+    const data =
+      await loaders.load(
+        "./sy.las",
+        loaders.LASLoader
+      );
+
+
+    console.log("LAS loaded");
+    console.log(data);
+
 
     /*
-     * ツールチップ
+     * 点群座標
+     *
+     * Float32Array
+     *
+     * [x,y,z,x,y,z,...]
      */
-    getTooltip: ({ object }) => {
 
-      if (!object) {
-        return null;
+    const positions =
+      data.attributes.POSITION.value;
+
+
+    /*
+     * RGB
+     *
+     * [r,g,b,a,r,g,b,a,...]
+     */
+
+    const colors =
+      data.attributes.COLOR_0?.value;
+
+
+    const pointCount =
+      data.header.vertexCount;
+
+
+    console.log(
+      "Point count:",
+      pointCount
+    );
+
+
+    /*
+     * deck.gl用データ
+     */
+
+    const points =
+      new Array(pointCount);
+
+
+    /*
+     * ============================================================
+     * 座標変換
+     * ============================================================
+     */
+
+    for (let i = 0; i < pointCount; i++) {
+
+      const x =
+        positions[i * 3];
+
+      const y =
+        positions[i * 3 + 1];
+
+      const z =
+        positions[i * 3 + 2];
+
+
+      /*
+       * EPSG:6677
+       * →
+       * WGS84
+       */
+
+      const position =
+        convertCoordinate(
+          x,
+          y,
+          z
+        );
+
+
+      /*
+       * RGB
+       */
+
+      let color = [
+        255,
+        255,
+        255
+      ];
+
+
+      if (colors) {
+
+        color = [
+
+          colors[i * 4],
+
+          colors[i * 4 + 1],
+
+          colors[i * 4 + 2]
+
+        ];
+
       }
 
-      return JSON.stringify(object);
 
-    },
+      points[i] = {
 
-    layers: [
+        position,
 
-      new deck.PointCloudLayer({
+        color
 
-        id: "las-point-cloud",
+      };
 
-        /*
-         * GitHub Pages上のsy.las
-         */
-        data: "./sy.las",
+    }
 
-        /*
-         * LAS Loader
-         */
-        loaders: [
-          LASLoader
-        ],
 
-        /*
-         * 点の大きさ
-         */
-        pointSize: 2,
+    /*
+     * 確認
+     */
 
-        /*
-         * 色
-         */
-        getColor: [255, 255, 255],
+    console.log(
+      "First converted point:",
+      points[0]
+    );
 
-        /*
-         * 法線
-         */
-        getNormal: [0, 0, 1],
 
-        /*
-         * クリック可能
-         */
-        pickable: true,
+    return points;
+  }
 
-        /*
-         * LAS読み込み完了
-         */
-        onDataLoad: (data) => {
 
-          console.log("LAS loaded");
+  /*
+   * ============================================================
+   * deck.gl
+   * ============================================================
+   */
 
-          console.log(data);
+  async function main() {
 
-        },
+    /*
+     * LAS読み込み
+     */
 
-        /*
-         * エラー
-         */
-        onError: (error) => {
+    const points =
+      await loadLAS();
 
-          console.error(
-            "LAS loading error:",
-            error
-          );
 
+    /*
+     * Viewer
+     */
+
+    new deck.DeckGL({
+
+      container: "app",
+
+
+      /*
+       * Google Mapsで確認した位置
+       */
+
+      initialViewState: {
+
+        longitude:
+          139.6228812732044,
+
+        latitude:
+          35.70540600403263,
+
+        zoom:
+          18,
+
+        pitch:
+          60,
+
+        bearing:
+          0
+
+      },
+
+
+      /*
+       * マウス操作
+       */
+
+      controller: true,
+
+
+      /*
+       * Tooltip
+       */
+
+      getTooltip: ({ object }) => {
+
+        if (!object) {
+          return null;
         }
 
-      })
 
-    ]
+        return {
+
+          text:
+            "Longitude: " +
+            object.position[0] +
+            "\n" +
+
+            "Latitude: " +
+            object.position[1] +
+            "\n" +
+
+            "Elevation: " +
+            object.position[2]
+
+        };
+
+      },
+
+
+      /*
+       * ========================================================
+       * PointCloud
+       * ========================================================
+       */
+
+      layers: [
+
+        new deck.PointCloudLayer({
+
+          id:
+            "las-point-cloud",
+
+
+          data:
+            points,
+
+
+          /*
+           * 座標
+           */
+
+          getPosition:
+            d => d.position,
+
+
+          /*
+           * RGB
+           */
+
+          getColor:
+            d => d.color,
+
+
+          /*
+           * 法線
+           */
+
+          getNormal:
+            [0, 0, 1],
+
+
+          /*
+           * 点の大きさ
+           */
+
+          pointSize:
+            2,
+
+
+          /*
+           * クリック・ホバー
+           */
+
+          pickable:
+            true
+
+        })
+
+      ]
+
+    });
+
+  }
+
+
+  /*
+   * ============================================================
+   * Start
+   * ============================================================
+   */
+
+  main().catch(error => {
+
+    console.error(
+      "LAS loading error:",
+      error
+    );
 
   });
 
 </script>
 
 </body>
-
 </html>
