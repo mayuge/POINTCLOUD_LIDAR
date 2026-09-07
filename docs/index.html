@@ -219,80 +219,18 @@ function convertCoordinate(
 
 /*
  * ============================================================
- * RGB変換
+ * LAS RGB 16bit → deck.gl RGB 8bit
  * ============================================================
  *
- * loaders.glから返ってくる値を確認して、
- * deck.gl用の 0〜255 に変換する。
+ * LASのRGBは uint16。
  *
- * 対応:
- *
- *   0〜1
- *   0〜255
- *   0〜65535
+ *   0     → 0
+ *   65535 → 255
  *
  * ============================================================
  */
 
-function convertColorValue(value) {
-
-  if (
-    value === undefined ||
-    value === null ||
-    Number.isNaN(value)
-  ) {
-
-    return 0;
-
-  }
-
-
-  /*
-   * 0〜1 のnormalized値
-   */
-
-  if (value >= 0 && value <= 1) {
-
-    return Math.round(
-
-      value * 255
-
-    );
-
-  }
-
-
-  /*
-   * 8bit RGB
-   */
-
-  if (value <= 255) {
-
-    return Math.round(value);
-
-  }
-
-
-  /*
-   * 16bit RGB
-   */
-
-  return Math.round(
-
-    value / 65535 * 255
-
-  );
-
-}
-
-
-/*
- * ============================================================
- * RGB
- * ============================================================
- */
-
-function convertColor(
+function convertLASRGB16(
 
   r,
   g,
@@ -302,29 +240,130 @@ function convertColor(
 
   return [
 
-    Math.max(
-      0,
-      Math.min(
-        255,
-        convertColorValue(r)
-      )
+    Math.round(
+      r / 65535 * 255
     ),
 
-    Math.max(
-      0,
-      Math.min(
-        255,
-        convertColorValue(g)
-      )
+    Math.round(
+      g / 65535 * 255
     ),
 
-    Math.max(
-      0,
-      Math.min(
-        255,
-        convertColorValue(b)
-      )
+    Math.round(
+      b / 65535 * 255
     )
+
+  ];
+
+}
+
+
+/*
+ * ============================================================
+ * LAS Point Format 3
+ * 生バイナリからRGBを直接取得
+ * ============================================================
+ *
+ * Point Data Record Format 3
+ *
+ * Point Record Size:
+ *
+ *   34 bytes
+ *
+ *
+ * RGB:
+ *
+ *   Red   → offset 28
+ *   Green → offset 30
+ *   Blue  → offset 32
+ *
+ *
+ * 各値:
+ *
+ *   uint16
+ *
+ *
+ * LASはLittle Endian。
+ *
+ * ============================================================
+ */
+
+function readLASRGB(
+
+  buffer,
+
+  pointOffset,
+
+  pointIndex,
+
+  pointRecordSize
+
+) {
+
+  const offset =
+
+    pointOffset +
+    pointIndex * pointRecordSize;
+
+
+  const view =
+
+    new DataView(
+
+      buffer
+
+    );
+
+
+  /*
+   * Red
+   */
+
+  const r =
+
+    view.getUint16(
+
+      offset + 28,
+
+      true
+
+    );
+
+
+  /*
+   * Green
+   */
+
+  const g =
+
+    view.getUint16(
+
+      offset + 30,
+
+      true
+
+    );
+
+
+  /*
+   * Blue
+   */
+
+  const b =
+
+    view.getUint16(
+
+      offset + 32,
+
+      true
+
+    );
+
+
+  return [
+
+    r,
+    g,
+    b
 
   ];
 
@@ -347,14 +386,58 @@ async function loadLAS() {
 
 
   /*
-   * LAS
+   * ==========================================================
+   * LASファイルを生バイナリとして取得
+   * ==========================================================
+   */
+
+  const rawResponse =
+
+    await fetch(
+
+      "./sy.las"
+
+    );
+
+
+  if (!rawResponse.ok) {
+
+    throw new Error(
+
+      `LAS file load failed: ${rawResponse.status} ${rawResponse.statusText}`
+
+    );
+
+  }
+
+
+  const rawBuffer =
+
+    await rawResponse.arrayBuffer();
+
+
+  console.log(
+
+    "Raw LAS buffer size:",
+
+    rawBuffer.byteLength
+
+  );
+
+
+  /*
+   * ==========================================================
+   * loaders.gl
+   *
+   * 座標の読み取りに使用
+   * ==========================================================
    */
 
   const data =
 
     await loaders.load(
 
-      "./sy.las",
+      rawBuffer,
 
       loaders.LASLoader
 
@@ -377,6 +460,106 @@ async function loadLAS() {
 
   /*
    * ==========================================================
+   * LAS loader情報
+   * ==========================================================
+   */
+
+  const loaderData =
+
+    data.loaderData;
+
+
+  const pointsOffset =
+
+    loaderData.pointsOffset;
+
+
+  const pointsStructSize =
+
+    loaderData.pointsStructSize;
+
+
+  const pointsFormatId =
+
+    loaderData.pointsFormatId;
+
+
+  console.log(
+
+    "Point offset:",
+
+    pointsOffset
+
+  );
+
+
+  console.log(
+
+    "Point record size:",
+
+    pointsStructSize
+
+  );
+
+
+  console.log(
+
+    "Point format:",
+
+    pointsFormatId
+
+  );
+
+
+  /*
+   * ==========================================================
+   * Point Format確認
+   * ==========================================================
+   *
+   * 今回想定:
+   *
+   *   Point Format 3
+   *   Record Size 34
+   *
+   * ==========================================================
+   */
+
+  if (
+
+    pointsFormatId !== 3
+
+  ) {
+
+    console.warn(
+
+      "This code expects LAS Point Format 3. Actual format:",
+
+      pointsFormatId
+
+    );
+
+  }
+
+
+  if (
+
+    pointsStructSize !== 34
+
+  ) {
+
+    console.warn(
+
+      "Expected Point Record Size 34. Actual size:",
+
+      pointsStructSize
+
+    );
+
+  }
+
+
+  /*
+   * ==========================================================
    * POSITION
    * ==========================================================
    */
@@ -395,7 +578,20 @@ async function loadLAS() {
 
   /*
    * ==========================================================
-   * COLOR
+   * COLOR_0
+   * ==========================================================
+   *
+   * 注意:
+   *
+   * 今回はこの値をRGBには使用しない。
+   *
+   * loaders.glでは
+   *
+   *   [0, 0, 0, 255]
+   *
+   * になってしまっているため、
+   * 生LASバイナリからRGBを読む。
+   *
    * ==========================================================
    */
 
@@ -405,39 +601,6 @@ async function loadLAS() {
       .attributes
       .COLOR_0;
 
-
-  const colors =
-
-    colorAttribute?.value;
-
-
-  /*
-   * ==========================================================
-   * 点数
-   * ==========================================================
-   */
-
-  const pointCount =
-
-    data
-      .header
-      .vertexCount;
-
-
-  console.log(
-
-    "Point count:",
-
-    pointCount
-
-  );
-
-
-  /*
-   * ==========================================================
-   * RGB情報確認
-   * ==========================================================
-   */
 
   console.log(
 
@@ -461,28 +624,28 @@ async function loadLAS() {
 
     "COLOR_0 type:",
 
-    colors?.constructor?.name
+    colorAttribute?.value?.constructor?.name
 
   );
 
 
-  if (colors) {
+  if (
+
+    colorAttribute?.value
+
+  ) {
 
     console.log(
 
-      "First raw color values:",
+      "loader COLOR_0 first values:",
 
       Array.from(
 
-        colors.slice(
+        colorAttribute.value.slice(
 
           0,
-          Math.min(
 
-            12,
-            colors.length
-
-          )
+          12
 
         )
 
@@ -495,32 +658,22 @@ async function loadLAS() {
 
   /*
    * ==========================================================
-   * RGBチャンネル数
-   * ==========================================================
-   *
-   * 通常:
-   *
-   *   size = 3
-   *       R G B
-   *
-   * または
-   *
-   *   size = 4
-   *       R G B A
-   *
+   * 点数
    * ==========================================================
    */
 
-  const colorSize =
+  const pointCount =
 
-    colorAttribute?.size || 3;
+    data
+      .header
+      .vertexCount;
 
 
   console.log(
 
-    "Using color size:",
+    "Point count:",
 
-    colorSize
+    pointCount
 
   );
 
@@ -611,84 +764,83 @@ async function loadLAS() {
      * ========================================================
      * RGB
      * ========================================================
+     *
+     * loaders.glのCOLOR_0は使わない。
+     *
+     * sy.lasの生バイナリから直接取得。
+     *
+     * ========================================================
      */
 
-    let color = [
+    const rawRGB =
 
-      255,
-      255,
-      255
+      readLASRGB(
 
-    ];
+        rawBuffer,
 
+        pointsOffset,
 
-    if (colors) {
+        i,
 
+        pointsStructSize
 
-      /*
-       * colorSizeに応じて
-       * RGBの位置を取得
-       */
-
-      const colorIndex =
-
-        i * colorSize;
+      );
 
 
-      const r =
+    /*
+     * ========================================================
+     * 16bit → 8bit
+     * ========================================================
+     */
 
-        colors[colorIndex];
+    const color =
 
+      convertLASRGB16(
 
-      const g =
+        rawRGB[0],
+        rawRGB[1],
+        rawRGB[2]
 
-        colors[colorIndex + 1];
-
-
-      const b =
-
-        colors[colorIndex + 2];
-
-
-      color =
-
-        convertColor(
-
-          r,
-          g,
-          b
-
-        );
+      );
 
 
-      /*
-       * 最初の点だけ確認
-       */
+    /*
+     * ========================================================
+     * 最初の点を確認
+     * ========================================================
+     */
 
-      if (i === 0) {
+    if (
 
-        console.log(
+      i === 0
 
-          "First raw RGB:",
+    ) {
 
-          [
-            r,
-            g,
-            b
-          ]
+      console.log(
 
-        );
+        "First LAS raw RGB16:",
+
+        rawRGB
+
+      );
 
 
-        console.log(
+      console.log(
 
-          "First converted RGB:",
+        "First converted RGB:",
 
-          color
+        color
 
-        );
+      );
 
-      }
+
+      console.log(
+
+        "First position:",
+
+        position
+
+      );
 
     }
 
@@ -712,7 +864,7 @@ async function loadLAS() {
 
   /*
    * ==========================================================
-   * 確認
+   * 最終確認
    * ==========================================================
    */
 
@@ -826,7 +978,9 @@ const map =
           attribution:
 
             "<a href=\"https://tiles.gsj.jp/tiles/elev/tiles.html\" target=\"_blank\">" +
+
             "産総研 陸地統合DEM" +
+
             "</a>"
 
         }
@@ -972,7 +1126,7 @@ map.on(
        * ======================================================
        * PointCloudLayer
        * ======================================================
-       */
+ */
 
       const pointCloudLayer =
 
@@ -983,7 +1137,9 @@ map.on(
 
 
           /*
+           * ==================================================
            * データ
+           * ==================================================
            */
 
           data:
@@ -991,7 +1147,9 @@ map.on(
 
 
           /*
+           * ==================================================
            * 座標
+           * ==================================================
            */
 
           getPosition:
@@ -1000,7 +1158,9 @@ map.on(
 
 
           /*
+           * ==================================================
            * RGB
+           * ==================================================
            */
 
           getColor:
@@ -1009,7 +1169,9 @@ map.on(
 
 
           /*
+           * ==================================================
            * 法線
+           * ==================================================
            */
 
           getNormal:
@@ -1018,7 +1180,9 @@ map.on(
 
 
           /*
+           * ==================================================
            * 点サイズ
+           * ==================================================
            */
 
           pointSize:
@@ -1026,7 +1190,9 @@ map.on(
 
 
           /*
+           * ==================================================
            * 選択
+           * ==================================================
            */
 
           pickable:
@@ -1034,7 +1200,9 @@ map.on(
 
 
           /*
+           * ==================================================
            * Tooltip
+           * ==================================================
            */
 
           getTooltip:
