@@ -10,7 +10,7 @@
     content="width=device-width, initial-scale=1.0"
   >
 
-  <title>LAS Point Cloud Viewer</title>
+  <title>copc Viewer</title>
 
 
   <!-- =========================================================
@@ -79,16 +79,6 @@
      * =========================================================
      * MapLibre
      * =========================================================
-     *
-     * jsDelivr +esm は
-     *
-     *   Module {
-     *     default: MapLibre
-     *   }
-     *
-     * を返すため、defaultを取り出す。
-     *
-     * =========================================================
      */
 
     import * as maplibreglModule
@@ -112,6 +102,21 @@
 
     /*
      * =========================================================
+     * PROJ4
+     * =========================================================
+     *
+     * EPSG:6677
+     * JGD2011 / Japan Plane Rectangular CS IX
+     *
+     * =========================================================
+     */
+
+    import proj4
+      from "https://cdn.jsdelivr.net/npm/proj4@2.15.0/+esm";
+
+
+    /*
+     * =========================================================
      * Debug
      * =========================================================
      */
@@ -131,6 +136,302 @@
       CopcLayer
     );
 
+    console.log(
+      "proj4:",
+      proj4
+    );
+
+
+    /*
+     * =========================================================
+     * COPC
+     * =========================================================
+     */
+
+    const COPC_URL =
+      "./sy.copc.laz";
+
+
+    /*
+     * =========================================================
+     * Coordinate Reference System
+     * =========================================================
+     */
+
+    const COPC_EPSG =
+      "EPSG:6677";
+
+    const WGS84 =
+      "EPSG:4326";
+
+
+    /*
+     * =========================================================
+     * EPSG:6677
+     * =========================================================
+     *
+     * JGD2011
+     * Japan Plane Rectangular CS IX
+     *
+     * 原点:
+     *
+     *   Latitude  = 36°
+     *   Longitude = 139°50′
+     *
+     * Unit:
+     *
+     *   meter
+     *
+     * =========================================================
+     */
+
+    proj4.defs(
+
+      COPC_EPSG,
+
+      "+proj=tmerc " +
+      "+lat_0=36 " +
+      "+lon_0=139.8333333333333 " +
+      "+k=0.9999 " +
+      "+x_0=0 " +
+      "+y_0=0 " +
+      "+ellps=GRS80 " +
+      "+units=m " +
+      "+no_defs"
+
+    );
+
+
+    /*
+     * =========================================================
+     * COPC Bounds
+     * =========================================================
+     *
+     * sy.copc.laz
+     *
+     * EPSG:6677
+     *
+     * X = Easting
+     * Y = Northing
+     * Z = Height
+     *
+     * Unit = meter
+     *
+     * =========================================================
+     */
+
+    const copcBounds = {
+
+      minX:
+        -19058.80,
+
+      maxX:
+        -19011.98,
+
+      minY:
+        -32698.68,
+
+      maxY:
+        -32645.51,
+
+      minZ:
+        44.89,
+
+      maxZ:
+        67.36
+
+    };
+
+
+    /*
+     * =========================================================
+     * Point Count
+     * =========================================================
+     */
+
+    const COPC_POINT_COUNT =
+      80454;
+
+
+    /*
+     * =========================================================
+     * Convert EPSG:6677 → EPSG:4326
+     * =========================================================
+     *
+     * 重要:
+     *
+     * 今回のLASは
+     *
+     *   X = Easting
+     *   Y = Northing
+     *
+     * なので、
+     *
+     *   [x, y]
+     *
+     * の順番をそのまま使用する。
+     *
+     * =========================================================
+     */
+
+    function convertCopcCoordinate(
+      x,
+      y
+    ) {
+
+      const result =
+        proj4(
+
+          COPC_EPSG,
+
+          WGS84,
+
+          [
+            x,
+            y
+          ]
+
+        );
+
+
+      return {
+
+        longitude:
+          result[0],
+
+        latitude:
+          result[1]
+
+      };
+
+    }
+
+
+    /*
+     * =========================================================
+     * Convert COPC Bounds
+     * =========================================================
+     */
+
+    function convertCopcBounds() {
+
+
+      console.log(
+        "========================================"
+      );
+
+      console.log(
+        "COPC BOUNDS"
+      );
+
+      console.log(
+        "========================================"
+      );
+
+
+      console.log(
+        "X:",
+        copcBounds.minX,
+        "→",
+        copcBounds.maxX,
+        "m"
+      );
+
+      console.log(
+        "Y:",
+        copcBounds.minY,
+        "→",
+        copcBounds.maxY,
+        "m"
+      );
+
+      console.log(
+        "Z:",
+        copcBounds.minZ,
+        "→",
+        copcBounds.maxZ,
+        "m"
+      );
+
+
+      /*
+       * -------------------------------------------------------
+       * Southwest
+       * -------------------------------------------------------
+       */
+
+      const southwest =
+        convertCopcCoordinate(
+
+          copcBounds.minX,
+          copcBounds.minY
+
+        );
+
+
+      /*
+       * -------------------------------------------------------
+       * Northeast
+       * -------------------------------------------------------
+       */
+
+      const northeast =
+        convertCopcCoordinate(
+
+          copcBounds.maxX,
+          copcBounds.maxY
+
+        );
+
+
+      console.log(
+        "========================================"
+      );
+
+      console.log(
+        "WGS84 BOUNDS"
+      );
+
+      console.log(
+        "========================================"
+      );
+
+
+      console.log(
+        "SouthWest:",
+        southwest
+      );
+
+      console.log(
+        "NorthEast:",
+        northeast
+      );
+
+
+      console.log(
+        "Longitude:",
+        southwest.longitude,
+        "→",
+        northeast.longitude
+      );
+
+      console.log(
+        "Latitude:",
+        southwest.latitude,
+        "→",
+        northeast.latitude
+      );
+
+
+      return {
+
+        southwest,
+        northeast
+
+      };
+
+    }
+
 
     /*
      * =========================================================
@@ -141,11 +442,13 @@
     const map =
       new maplibregl.Map({
 
-        container: "map",
+        container:
+          "map",
 
         style: {
 
-          version: 8,
+          version:
+            8,
 
           sources: {},
 
@@ -160,11 +463,14 @@
 
         ],
 
-        zoom: 15,
+        zoom:
+          15,
 
-        pitch: 60,
+        pitch:
+          60,
 
-        bearing: 0
+        bearing:
+          0
 
       });
 
@@ -176,7 +482,9 @@
      */
 
     map.on(
+
       "error",
+
       (event) => {
 
         console.error(
@@ -185,6 +493,7 @@
         );
 
       }
+
     );
 
 
@@ -195,11 +504,22 @@
      */
 
     map.on(
+
       "load",
+
       () => {
+
+
+        console.log(
+          "========================================"
+        );
 
         console.log(
           "MapLibre loaded"
+        );
+
+        console.log(
+          "========================================"
         );
 
 
@@ -215,7 +535,8 @@
 
           {
 
-            type: "raster",
+            type:
+              "raster",
 
             tiles: [
 
@@ -223,7 +544,8 @@
 
             ],
 
-            tileSize: 256,
+            tileSize:
+              256,
 
             attribution:
               '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">国土地理院</a>'
@@ -235,15 +557,19 @@
 
         map.addLayer({
 
-          id: "gsi-aerial",
+          id:
+            "gsi-aerial",
 
-          type: "raster",
+          type:
+            "raster",
 
-          source: "gsi-aerial",
+          source:
+            "gsi-aerial",
 
           paint: {
 
-            "raster-opacity": 1.0
+            "raster-opacity":
+              1.0
 
           }
 
@@ -252,118 +578,167 @@
 
         /*
          * =====================================================
-         * COPC Layer
-         * =====================================================
-         *
-         * 注意：
-         *
-         * onInitialized は指定しない。
-         *
-         * maplibre-copc-layer は内部でこの設定値を
-         * WorkerへpostMessageするため、
-         * JavaScript Functionを渡すと
-         *
-         * DataCloneError
-         *
-         * になる。
-         *
+         * COPC Bounds
          * =====================================================
          */
 
-        const copcLayer =
-          new CopcLayer({
-
-            /*
-             * Layer ID
-             */
-
-            id: "copc",
+        const bounds =
+          convertCopcBounds();
 
 
-            /*
-             * COPC / LAZ
-             */
+        /*
+         * =====================================================
+         * MapLibre Bounds
+         * =====================================================
+         */
 
-            url: "./sy.copc.laz",
+        const mapBounds =
+          new maplibregl.LngLatBounds(
 
+            [
 
-            /*
-             * =================================================
-             * Color
-             * =================================================
-             *
-             * LASに格納されているRGBを使用
-             */
+              bounds.southwest.longitude,
+              bounds.southwest.latitude
 
-            colorMode: "rgb",
+            ],
 
+            [
 
-            /*
-             * =================================================
-             * Point Size
-             * =================================================
-             */
+              bounds.northeast.longitude,
+              bounds.northeast.latitude
 
-            pointSize: 3,
+            ]
 
-
-            /*
-             * =================================================
-             * Depth Test
-             * =================================================
-             */
-
-            depthTest: false,
+          );
 
 
-            /*
-             * =================================================
-             * Root
-             * =================================================
-             */
-
-            alwaysShowRoot: true,
-
-
-            /*
-             * =================================================
-             * SSAO
-             * =================================================
-             */
-
-            enableSSAO: false,
-
-
-            /*
-             * =================================================
-             * Debug
-             * =================================================
-             */
-
-            debug: true
-
-          });
+        console.log(
+          "MapLibre Bounds:",
+          mapBounds
+        );
 
 
         /*
          * =====================================================
          * COPC Layer
          * =====================================================
+         *
+         * onInitializedは指定しない。
+         *
+         * FunctionをWorkerへ渡すと
+         * DataCloneErrorになるため。
+         *
+         * =====================================================
          */
 
-        console.log(
-          "Adding COPC layer..."
-        );
+      const copcLayer = new CopcLayer(
+  "./sy.copc.laz",
+  {
+    colorMode: "white",
+    pointSize: 10,
+    alwaysShowRoot: true,
+    sseThreshold: 100,
+    depthTest: false,
+    enableSSAO: false,
+    debug: true,
+  },
+  "copc"
+);
 
-
-        map.addLayer(
-          copcLayer
-        );
-
+map.addLayer(copcLayer);
 
         console.log(
           "COPC layer added"
         );
+
+
+        /*
+         * =====================================================
+         * Fit to COPC
+         * =====================================================
+         */
+
+        map.fitBounds(
+
+          mapBounds,
+
+          {
+
+            padding:
+              100,
+
+            duration:
+              1000,
+
+            pitch:
+              60
+
+          }
+
+        );
+
+
+        /*
+         * =====================================================
+         * Final Debug
+         * =====================================================
+         */
+
+        console.log(
+          "========================================"
+        );
+
+        console.log(
+          "COPC READY"
+        );
+
+        console.log(
+          "========================================"
+        );
+
+        console.log(
+          "URL:",
+          COPC_URL
+        );
+
+        console.log(
+          "CRS:",
+          COPC_EPSG
+        );
+
+        console.log(
+          "Point Count:",
+          COPC_POINT_COUNT
+        );
+
+        console.log(
+          "X:",
+          copcBounds.minX,
+          "→",
+          copcBounds.maxX,
+          "m"
+        );
+
+        console.log(
+          "Y:",
+          copcBounds.minY,
+          "→",
+          copcBounds.maxY,
+          "m"
+        );
+
+        console.log(
+          "Z:",
+          copcBounds.minZ,
+          "→",
+          copcBounds.maxZ,
+          "m"
+        );
+
+        console.log(
+          "========================================"
+        );
+
 
       }
 
@@ -371,6 +746,7 @@
 
 
   </script>
+
 
 </body>
 
