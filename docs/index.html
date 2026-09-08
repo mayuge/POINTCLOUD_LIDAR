@@ -12,49 +12,10 @@
 
 	<title>荻窪3D</title>
 
-
-	<!-- =========================================================
-	     MapLibre CSS
-	     ========================================================= -->
-
 	<link
 		rel="stylesheet"
 		href="https://unpkg.com/maplibre-gl@5.0.0/dist/maplibre-gl.css"
 	>
-
-
-	<!-- =========================================================
-	     Import Map
-	     =========================================================
-	
-	     maplibre-copc-layer は内部で
-	
-	         import maplibregl from "maplibre-gl"
-	
-	     を行うため、
-	
-	         maplibre-gl
-	         ↓
-	         shim
-	         ↓
-	         esm.sh/maplibre-gl
-	
-	     と解決させる。
-	
-	     ========================================================= -->
-
-	<script type="importmap">
-	{
-		"imports": {
-			"maplibre-gl": "data:text/javascript,import%20*%20as%20maplibregl%20from%20%22https%3A%2F%2Fesm.sh%2Fmaplibre-gl%405.0.0%22%3B%0Aexport%20default%20maplibregl%3B%0Aexport%20*%20from%20%22https%3A%2F%2Fesm.sh%2Fmaplibre-gl%405.0.0%22%3B"
-		}
-	}
-	</script>
-
-
-	<!-- =========================================================
-	     Style
-	     ========================================================= -->
 
 	<style>
 
@@ -83,385 +44,300 @@
 
 <body>
 
-
-	<!-- =========================================================
-	     Map Container
-	     ========================================================= -->
-
-	<div id="map"></div>
+<div id="map"></div>
 
 
-	<!-- =========================================================
-	     Application
-	     ========================================================= -->
+<script type="module">
 
-	<script type="module">
+	/*
+	 * =========================================================
+	 * MapLibre
+	 * =========================================================
+	 *
+	 * あなたが以前使っていたshimと同じ考え方
+	 *
+	 * =========================================================
+	 */
+
+	import * as maplibregl
+		from "https://esm.sh/maplibre-gl@5.0.0"
 
 
-		/*
-		 * ========================================================
-		 * MapLibre
-		 * ========================================================
-		 */
+	/*
+	 * =========================================================
+	 * COPC Layer
+	 * =========================================================
+	 *
+	 * bundleを使わない
+	 *
+	 */
 
-		import maplibregl from "maplibre-gl"
-
-
-
-		/*
-		 * ========================================================
-		 * COPC Layer
-		 * ========================================================
-		 */
-
-		import {
-			CopcLayer
-		}
-		from "https://esm.sh/maplibre-copc-layer@0.2.0?bundle"
+	import {
+		CopcLayer
+	}
+	from "https://esm.sh/maplibre-copc-layer@0.2.0?target=es2022&external=maplibre-gl"
 
 
 
-		/*
-		 * ========================================================
-		 * Map
-		 * ========================================================
-		 */
+	/*
+	 * =========================================================
+	 * Map
+	 * =========================================================
+	 */
 
-		const map = new maplibregl.Map({
+	const map = new maplibregl.Map({
 
-			container: "map",
+		container: "map",
 
+		style: {
 
-			/*
-			 * ----------------------------------------------------
-			 * Style
-			 * ----------------------------------------------------
-			 */
+			version: 8,
 
-			style: {
-
-				version: 8,
-
+			sources: {
 
 				/*
-				 * ------------------------------------------------
-				 * Sources
-				 * ------------------------------------------------
+				 * 地理院航空写真
 				 */
 
-				sources: {
+				"gsi-photo": {
 
+					type: "raster",
 
-					/*
-					 * 地理院航空写真
-					 */
+					tiles: [
 
-					"gsi-photo": {
+						"https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg"
 
-						type: "raster",
+					],
 
-						tiles: [
+					tileSize: 256,
 
-							"https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg"
-
-						],
-
-						tileSize: 256,
-
-						attribution: "国土地理院"
-
-					},
-
-
-					/*
-					 * 産総研 陸地統合DEM
-					 */
-
-					"terrain": {
-
-						type: "raster-dem",
-
-						tiles: [
-
-							"https://gbank.gsj.jp/seamless/elev/terrainRGB/land/{z}/{y}/{x}.png"
-
-						],
-
-						tileSize: 256,
-
-						encoding: "mapbox",
-
-						attribution: "産総研 陸地統合DEM"
-
-					}
+					attribution: "国土地理院"
 
 				},
 
 
 				/*
-				 * ------------------------------------------------
-				 * Layers
-				 * ------------------------------------------------
+				 * 産総研 陸地統合DEM
 				 */
 
-				layers: [
+				"terrain": {
 
-					{
+					type: "raster-dem",
 
-						id: "gsi-photo",
+					tiles: [
 
-						type: "raster",
+						"https://gbank.gsj.jp/seamless/elev/terrainRGB/land/{z}/{y}/{x}.png"
 
-						source: "gsi-photo"
+					],
 
-					}
+					tileSize: 256,
 
-				],
+					encoding: "mapbox",
 
-
-				/*
-				 * ------------------------------------------------
-				 * Terrain
-				 * ------------------------------------------------
-				 */
-
-				terrain: {
-
-					source: "terrain",
-
-					exaggeration: 1
+					attribution: "産総研 陸地統合DEM"
 
 				}
 
 			},
 
 
-			/*
-			 * ----------------------------------------------------
-			 * Camera
-			 * ----------------------------------------------------
-			 */
+			layers: [
 
-			hash: true,
+				{
 
-			zoom: 17,
+					id: "gsi-photo",
 
-			center: [
+					type: "raster",
 
-				139.6203,
-				35.7048
-
-			],
-
-			pitch: 60,
-
-			bearing: 0,
-
-			attributionControl: false
-
-		})
-
-
-
-		/*
-		 * ========================================================
-		 * Navigation Control
-		 * ========================================================
-		 */
-
-		map.addControl(
-
-			new maplibregl.NavigationControl(),
-
-			"top-right"
-
-		)
-
-
-
-		/*
-		 * ========================================================
-		 * Attribution
-		 * ========================================================
-		 */
-
-		map.addControl(
-
-			new maplibregl.AttributionControl({
-
-				compact: true,
-
-				customAttribution: "地理院タイル"
-
-			})
-
-		)
-
-
-
-		/*
-		 * ========================================================
-		 * COPC Layer
-		 * ========================================================
-		 */
-
-		const copcLayer = new CopcLayer(
-
-			"./sy.copc.laz",
-
-			{
-
-				/*
-				 * RGBカラー
-				 */
-
-				colorMode: "rgb",
-
-
-				/*
-				 * 点サイズ
-				 */
-
-				pointSize: 3,
-
-
-				/*
-				 * 深度テスト
-				 */
-
-				depthTest: false,
-
-
-				/*
-				 * Root Node
-				 */
-
-				alwaysShowRoot: true,
-
-
-				/*
-				 * SSAO
-				 */
-
-				enableSSAO: false,
-
-
-				/*
-				 * Debug
-				 */
-
-				debug: true,
-
-
-				/*
-				 * COPC初期化完了
-				 */
-
-				onInitialized: ({ bounds }) => {
-
-					console.log(
-						"COPC initialized",
-						bounds
-					)
-
-
-					/*
-					 * 中心座標
-					 */
-
-					const centerLongitude =
-						(bounds.minx + bounds.maxx) / 2
-
-
-					const centerLatitude =
-						(bounds.miny + bounds.maxy) / 2
-
-
-					console.log(
-						"COPC center:",
-						centerLongitude,
-						centerLatitude
-					)
-
-
-					/*
-					 * COPC中心へ移動
-					 */
-
-					map.flyTo({
-
-						center: [
-
-							centerLongitude,
-							centerLatitude
-
-						],
-
-						zoom: 17,
-
-						pitch: 60,
-
-						bearing: 0
-
-					})
+					source: "gsi-photo"
 
 				}
 
+			],
+
+
+			terrain: {
+
+				source: "terrain",
+
+				exaggeration: 1
+
 			}
 
-		)
+		},
+
+
+		hash: true,
+
+		zoom: 17,
+
+		center: [
+
+			139.6203,
+			35.7048
+
+		],
+
+		pitch: 60,
+
+		bearing: 0,
+
+		attributionControl: false
+
+	})
+
+
+	/*
+	 * =========================================================
+	 * Controls
+	 * =========================================================
+	 */
+
+	map.addControl(
+
+		new maplibregl.NavigationControl(),
+
+		"top-right"
+
+	)
+
+
+	map.addControl(
+
+		new maplibregl.AttributionControl({
+
+			compact: true,
+
+			customAttribution: "地理院タイル"
+
+		})
+
+	)
 
 
 
-		/*
-		 * ========================================================
-		 * Map Load
-		 * ========================================================
-		 */
+	/*
+	 * =========================================================
+	 * COPC Layer
+	 * =========================================================
+	 */
 
-		map.on(
+	const copcLayer = new CopcLayer(
 
-			"load",
+		"./sy.copc.laz",
 
-			() => {
+		{
+
+			colorMode: "rgb",
+
+			pointSize: 3,
+
+			depthTest: false,
+
+			alwaysShowRoot: true,
+
+			enableSSAO: false,
+
+			debug: true,
+
+
+			onInitialized: ({ bounds }) => {
 
 				console.log(
-					"Map loaded"
+					"COPC initialized",
+					bounds
 				)
 
 
-				map.addLayer(
-					copcLayer
+				const centerLongitude =
+					(bounds.minx + bounds.maxx) / 2
+
+
+				const centerLatitude =
+					(bounds.miny + bounds.maxy) / 2
+
+
+				console.log(
+					"COPC center:",
+					centerLongitude,
+					centerLatitude
 				)
+
+
+				map.flyTo({
+
+					center: [
+
+						centerLongitude,
+						centerLatitude
+
+					],
+
+					zoom: 17,
+
+					pitch: 60,
+
+					bearing: 0
+
+				})
 
 			}
 
-		)
+		}
+
+	)
 
 
 
-		/*
-		 * ========================================================
-		 * Error
-		 * ========================================================
-		 */
+	/*
+	 * =========================================================
+	 * Map Load
+	 * =========================================================
+	 */
 
-		map.on(
+	map.on(
 
-			"error",
+		"load",
 
-			(event) => {
+		() => {
 
-				console.error(
-					"MapLibre error:",
-					event
-				)
+			console.log(
+				"Map loaded"
+			)
 
-			}
 
-		)
+			map.addLayer(
+				copcLayer
+			)
 
-	</script>
+		}
+
+	)
+
+
+
+	/*
+	 * =========================================================
+	 * Error
+	 * =========================================================
+	 */
+
+	map.on(
+
+		"error",
+
+		(event) => {
+
+			console.error(
+				"MapLibre error:",
+				event
+			)
+
+		}
+
+	)
+
+</script>
 
 </body>
 
