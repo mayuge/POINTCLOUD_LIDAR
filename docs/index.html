@@ -1,344 +1,262 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-	<meta charset="UTF-8">
+  <title>LAS Point Cloud Viewer</title>
 
-	<meta
-		name="viewport"
-		content="width=device-width, initial-scale=1.0"
-	>
+  <!-- =========================================================
+       MapLibre CSS
+       ========================================================= -->
+  <link
+    href="https://unpkg.com/maplibre-gl@5.0.0/dist/maplibre-gl.css"
+    rel="stylesheet"
+  >
 
-	<title>荻窪3D</title>
-
-	<link
-		rel="stylesheet"
-		href="https://unpkg.com/maplibre-gl@5.0.0/dist/maplibre-gl.css"
-	>
-
-	<style>
-
-		html,
-		body,
-		#map {
-
-			width: 100%;
-			height: 100%;
-
-			margin: 0;
-			padding: 0;
-
-		}
-
-		body {
-
-			overflow: hidden;
-
-		}
-
-	</style>
+  <!-- =========================================================
+       maplibre-gl shim
+       
+       maplibre-copc-layer は内部で
+       
+         import maplibregl from "maplibre-gl"
+       
+       としているため、MapLibre v5 の namespace export を
+       default export に変換する。
+       
+       外部の maplibre-shim.js は不要。
+       ========================================================= -->
+  <script type="importmap">
+  {
+    "imports": {
+      "maplibre-gl": "data:text/javascript;charset=utf-8,import%20*%20as%20maplibregl%20from%20'https%3A%2F%2Fesm.sh%2Fmaplibre-gl%405.0.0%3Ftarget%3Des2022'%3B%20export%20default%20maplibregl%3B%20export%20*%20from%20'https%3A%2F%2Fesm.sh%2Fmaplibre-gl%405.0.0%3Ftarget%3Des2022'%3B"
+    }
+  }
+  </script>
 
 </head>
 
-
 <body>
 
-<div id="map"></div>
+  <div
+    id="map"
+    style="
+      position:absolute;
+      inset:0;
+    "
+  ></div>
 
+  <!-- =========================================================
+       Application
+       ========================================================= -->
+  <script type="module">
 
-<script type="module">
+    /*
+     * ---------------------------------------------------------
+     * MapLibre
+     * ---------------------------------------------------------
+     *
+     * importmap により
+     *
+     *   "maplibre-gl"
+     *
+     * が data URL の shim に解決される。
+     *
+     * ここでは namespace import を使う。
+     * ---------------------------------------------------------
+     */
+    import * as maplibregl
+      from "maplibre-gl";
 
-	/*
-	 * =========================================================
-	 * MapLibre
-	 * =========================================================
-	 *
-	 * あなたが以前使っていたshimと同じ考え方
-	 *
-	 * =========================================================
-	 */
 
-	import * as maplibregl
-		from "https://esm.sh/maplibre-gl@5.0.0"
+    /*
+     * ---------------------------------------------------------
+     * COPC Layer
+     * ---------------------------------------------------------
+     */
+    import {
+      CopcLayer
+    } from "https://esm.sh/maplibre-copc-layer@0.2.0?target=es2022";
 
 
-	/*
-	 * =========================================================
-	 * COPC Layer
-	 * =========================================================
-	 *
-	 * bundleを使わない
-	 *
-	 */
+    /*
+     * ---------------------------------------------------------
+     * Map
+     * ---------------------------------------------------------
+     */
+    const map = new maplibregl.Map({
 
-	import {
-		CopcLayer
-	}
-	from "https://esm.sh/maplibre-copc-layer@0.2.0?target=es2022&external=maplibre-gl"
+      container: "map",
 
+      style: {
+        version: 8,
 
+        sources: {},
 
-	/*
-	 * =========================================================
-	 * Map
-	 * =========================================================
-	 */
+        layers: []
+      },
 
-	const map = new maplibregl.Map({
+      center: [
+        139.6200,
+        35.7000
+      ],
 
-		container: "map",
+      zoom: 15,
 
-		style: {
+      pitch: 60,
 
-			version: 8,
+      bearing: 0
 
-			sources: {
+    });
 
-				/*
-				 * 地理院航空写真
-				 */
 
-				"gsi-photo": {
+    /*
+     * ---------------------------------------------------------
+     * 地理院航空写真
+     * ---------------------------------------------------------
+     */
+    map.addSource(
+      "gsi-aerial",
+      {
+        type: "raster",
 
-					type: "raster",
+        tiles: [
+          "https://cyberjapandata.gsi.go.jp/xyz/ort/{z}/{x}/{y}.jpg"
+        ],
 
-					tiles: [
+        tileSize: 256,
 
-						"https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg"
+        attribution:
+          '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">国土地理院</a>'
+      }
+    );
 
-					],
 
-					tileSize: 256,
+    map.addLayer({
 
-					attribution: "国土地理院"
+      id: "gsi-aerial",
 
-				},
+      type: "raster",
 
+      source: "gsi-aerial",
 
-				/*
-				 * 産総研 陸地統合DEM
-				 */
+      paint: {
 
-				"terrain": {
+        "raster-opacity": 1.0
 
-					type: "raster-dem",
+      }
 
-					tiles: [
+    });
 
-						"https://gbank.gsj.jp/seamless/elev/terrainRGB/land/{z}/{y}/{x}.png"
 
-					],
+    /*
+     * ---------------------------------------------------------
+     * COPC
+     * ---------------------------------------------------------
+     */
+    const copcLayer = new CopcLayer({
 
-					tileSize: 256,
+      id: "copc",
 
-					encoding: "mapbox",
+      url: "./sy.copc.laz",
 
-					attribution: "産総研 陸地統合DEM"
+      /*
+       * LAS RGBをそのまま利用
+       */
+      colorMode: "rgb",
 
-				}
+      /*
+       * 点のサイズ
+       */
+      pointSize: 3,
 
-			},
+      /*
+       * 深度テスト
+       */
+      depthTest: false,
 
+      /*
+       * Root nodeを常に表示
+       */
+      alwaysShowRoot: true,
 
-			layers: [
+      /*
+       * SSAO
+       */
+      enableSSAO: false,
 
-				{
+      /*
+       * デバッグ
+       */
+      debug: true,
 
-					id: "gsi-photo",
+      /*
+       * 初期化後
+       */
+      onInitialized: (layer) => {
 
-					type: "raster",
+        console.log(
+          "COPC initialized",
+          layer
+        );
 
-					source: "gsi-photo"
+        /*
+         * bounds が取得できる場合
+         */
+        if (layer.bounds) {
 
-				}
+          console.log(
+            "COPC bounds:",
+            layer.bounds
+          );
 
-			],
+        }
 
+      }
 
-			terrain: {
+    });
 
-				source: "terrain",
 
-				exaggeration: 1
+    /*
+     * ---------------------------------------------------------
+     * MapLibreに追加
+     * ---------------------------------------------------------
+     */
+    map.on(
+      "load",
+      () => {
 
-			}
+        console.log(
+          "MapLibre loaded"
+        );
 
-		},
+        map.addLayer(
+          copcLayer
+        );
 
+      }
+    );
 
-		hash: true,
 
-		zoom: 17,
+    /*
+     * ---------------------------------------------------------
+     * エラー監視
+     * ---------------------------------------------------------
+     */
+    map.on(
+      "error",
+      (event) => {
 
-		center: [
+        console.error(
+          "MapLibre error:",
+          event
+        );
 
-			139.6203,
-			35.7048
+      }
+    );
 
-		],
-
-		pitch: 60,
-
-		bearing: 0,
-
-		attributionControl: false
-
-	})
-
-
-	/*
-	 * =========================================================
-	 * Controls
-	 * =========================================================
-	 */
-
-	map.addControl(
-
-		new maplibregl.NavigationControl(),
-
-		"top-right"
-
-	)
-
-
-	map.addControl(
-
-		new maplibregl.AttributionControl({
-
-			compact: true,
-
-			customAttribution: "地理院タイル"
-
-		})
-
-	)
-
-
-
-	/*
-	 * =========================================================
-	 * COPC Layer
-	 * =========================================================
-	 */
-
-	const copcLayer = new CopcLayer(
-
-		"./sy.copc.laz",
-
-		{
-
-			colorMode: "rgb",
-
-			pointSize: 3,
-
-			depthTest: false,
-
-			alwaysShowRoot: true,
-
-			enableSSAO: false,
-
-			debug: true,
-
-
-			onInitialized: ({ bounds }) => {
-
-				console.log(
-					"COPC initialized",
-					bounds
-				)
-
-
-				const centerLongitude =
-					(bounds.minx + bounds.maxx) / 2
-
-
-				const centerLatitude =
-					(bounds.miny + bounds.maxy) / 2
-
-
-				console.log(
-					"COPC center:",
-					centerLongitude,
-					centerLatitude
-				)
-
-
-				map.flyTo({
-
-					center: [
-
-						centerLongitude,
-						centerLatitude
-
-					],
-
-					zoom: 17,
-
-					pitch: 60,
-
-					bearing: 0
-
-				})
-
-			}
-
-		}
-
-	)
-
-
-
-	/*
-	 * =========================================================
-	 * Map Load
-	 * =========================================================
-	 */
-
-	map.on(
-
-		"load",
-
-		() => {
-
-			console.log(
-				"Map loaded"
-			)
-
-
-			map.addLayer(
-				copcLayer
-			)
-
-		}
-
-	)
-
-
-
-	/*
-	 * =========================================================
-	 * Error
-	 * =========================================================
-	 */
-
-	map.on(
-
-		"error",
-
-		(event) => {
-
-			console.error(
-				"MapLibre error:",
-				event
-			)
-
-		}
-
-	)
-
-</script>
+  </script>
 
 </body>
-
 </html>
