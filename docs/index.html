@@ -1,1000 +1,289 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
-
 <head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <meta charset="UTF-8">
+	<title>荻窪3D</title>
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
+	<link
+		rel="stylesheet"
+		href="https://unpkg.com/maplibre-gl@5.0.0/dist/maplibre-gl.css"
+	>
 
-  <title>LAS Point Cloud Viewer</title>
+	<style>
+		html,
+		body,
+		#map {
+			width: 100%;
+			height: 100%;
+			margin: 0;
+			padding: 0;
+		}
 
-
-  <!-- =========================================================
-       MapLibre GL JS 5
-       ========================================================= -->
-
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/maplibre-gl@5.7.0/dist/maplibre-gl.css"
-  >
-
-  <script
-    src="https://unpkg.com/maplibre-gl@5.7.0/dist/maplibre-gl.js"
-  ></script>
-
-
-  <!-- =========================================================
-       deck.gl
-       ========================================================= -->
-
-  <script
-    src="https://unpkg.com/deck.gl@9.3.6/dist.min.js"
-  ></script>
-
-
-  <!-- =========================================================
-       loaders.gl LAS
-       ========================================================= -->
-
-  <script
-    src="https://unpkg.com/@loaders.gl/las@4.3.3/dist/dist.min.js"
-  ></script>
-
-
-  <!-- =========================================================
-       proj4
-       ========================================================= -->
-
-  <script
-    src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.15.0/proj4.js"
-  ></script>
-
-
-  <style>
-
-    html,
-    body {
-
-      margin: 0;
-
-      width: 100%;
-      height: 100%;
-
-      overflow: hidden;
-
-      background: #111;
-
-    }
-
-
-    #map {
-
-      width: 100%;
-      height: 100%;
-
-    }
-
-
-    #info {
-
-      position: absolute;
-
-      left: 10px;
-      bottom: 10px;
-
-      z-index: 10;
-
-      padding: 6px 10px;
-
-      background: rgba(255, 255, 255, 0.85);
-
-      font-family: sans-serif;
-
-      font-size: 12px;
-
-      pointer-events: none;
-
-    }
-
-  </style>
-
+		body {
+			overflow: hidden;
+		}
+	</style>
 </head>
-
 
 <body>
 
-
 <div id="map"></div>
 
+<script type="module">
 
-<div id="info">
+	import maplibregl from
+		"https://esm.sh/maplibre-gl@5.0.0?target=es2022"
 
-  国土地理院「全国最新写真（シームレス）」＋
-  産総研「陸地統合DEM」＋ LAS
+	import { CopcLayer } from
+		"https://esm.sh/maplibre-copc-layer@0.2.0?bundle"
 
-</div>
 
+	/*
+	 * =========================================================
+	 * MapLibre
+	 * =========================================================
+	 */
 
-<script>
+	const map = new maplibregl.Map({
 
-/*
- * ============================================================
- * Viewer設定
- * ============================================================
- */
+		container: "map",
 
-const CENTER = {
+		style: {
 
-  longitude:
-    139.6228812732044,
+			version: 8,
 
-  latitude:
-    35.70540600403263
+			sources: {
 
-};
+				/*
+				 * -------------------------------------------------
+				 * 地理院航空写真
+				 * -------------------------------------------------
+				 */
 
+				"gsi-photo": {
 
-const INITIAL_ZOOM = 18;
+					type: "raster",
 
+					tiles: [
+						"https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg"
+					],
 
-/*
- * ============================================================
- * LAS CRS
- * ============================================================
- *
- * JGD2011 / Japan Plane Rectangular CS IX
- *
- * EPSG:6677
- *
- * ============================================================
- */
+					tileSize: 256,
 
-proj4.defs(
+					attribution: "国土地理院"
+				},
 
-  "EPSG:6677",
 
-  "+proj=tmerc " +
-  "+lat_0=36 " +
-  "+lon_0=139.8333333333333 " +
-  "+k=0.9999 " +
-  "+x_0=0 " +
-  "+y_0=0 " +
-  "+ellps=GRS80 " +
-  "+units=m " +
-  "+no_defs"
+				/*
+				 * -------------------------------------------------
+				 * 産総研 陸地統合DEM
+				 * -------------------------------------------------
+				 */
 
-);
+				"terrain": {
 
+					type: "raster-dem",
 
-/*
- * ============================================================
- * LAS → WGS84
- * ============================================================
- */
+					tiles: [
+						"https://gbank.gsj.jp/seamless/elev/terrainRGB/land/{z}/{y}/{x}.png"
+					],
 
-function convertCoordinate(
+					tileSize: 256,
 
-  x,
-  y,
-  z
+					encoding: "mapbox",
 
-) {
+					attribution: "産総研 陸地統合DEM"
+				}
+			},
 
-  const [
 
-    longitude,
-    latitude
+			/*
+			 * ---------------------------------------------------
+			 * MapLibre Layers
+			 * ---------------------------------------------------
+			 */
 
-  ] =
+			layers: [
 
-    proj4(
+				{
+					id: "gsi-photo",
 
-      "EPSG:6677",
+					type: "raster",
 
-      "EPSG:4326",
+					source: "gsi-photo"
+				}
+			],
 
-      [
-        x,
-        y
-      ]
 
-    );
+			/*
+			 * ---------------------------------------------------
+			 * Terrain
+			 * ---------------------------------------------------
+			 */
 
+			terrain: {
 
-  return [
+				source: "terrain",
 
-    longitude,
-    latitude,
-    z
+				exaggeration: 1
+			}
+		},
 
-  ];
 
-}
+		/*
+		 * -----------------------------------------------------
+		 * 初期表示
+		 * -----------------------------------------------------
+		 */
 
+		hash: true,
 
-/*
- * ============================================================
- * LAS読み込み
- * ============================================================
- */
+		zoom: 17,
 
-async function loadLAS() {
+		center: [
+			139.6203,
+			35.7048
+		],
 
-  console.log(
-    "LAS loading..."
-  );
+		pitch: 60,
 
+		bearing: 0,
 
-  /*
-   * ==========================================================
-   * LASファイルを取得
-   * ==========================================================
-   */
 
-  const rawResponse =
+		/*
+		 * Attribution
+		 */
 
-    await fetch(
-      "./sy.las"
-    );
+		attributionControl: false
+	})
 
 
-  if (!rawResponse.ok) {
+	/*
+	 * =========================================================
+	 * Navigation
+	 * =========================================================
+	 */
 
-    throw new Error(
+	map.addControl(
+		new maplibregl.NavigationControl()
+	)
 
-      `LAS file load failed: ${
-        rawResponse.status
-      } ${
-        rawResponse.statusText
-      }`
 
-    );
+	/*
+	 * =========================================================
+	 * Attribution
+	 * =========================================================
+	 */
 
-  }
+	map.addControl(
 
+		new maplibregl.AttributionControl({
 
-  const rawBuffer =
+			compact: true,
 
-    await rawResponse.arrayBuffer();
+			customAttribution:
+				"地理院タイル"
+		})
+	)
 
 
-  console.log(
+	/*
+	 * =========================================================
+	 * COPC Point Cloud
+	 * =========================================================
+	 */
 
-    "Raw LAS buffer size:",
+	const copcLayer = new CopcLayer(
 
-    rawBuffer.byteLength
+		"./sy.copc.laz",
 
-  );
+		{
 
+			/*
+			 * RGBカラー
+			 */
+			colorMode: "rgb",
 
-  /*
-   * ==========================================================
-   * loaders.gl
-   *
-   * colorDepth: 8
-   *
-   * LASのRGBをloader側で8bit化する。
-   * ==========================================================
-   */
 
-  const data =
+			/*
+			 * 点の大きさ
+			 */
+			pointSize: 3,
 
-    await loaders.load(
 
-      rawBuffer,
+			/*
+			 * 深度テスト
+			 */
+			depthTest: false,
 
-      loaders.LASLoader,
 
-      {
+			/*
+			 * Root nodeを常に表示
+			 */
+			alwaysShowRoot: true,
 
-        las: {
 
-          colorDepth: 8
+			/*
+			 * SSAO
+			 */
+			enableSSAO: false,
 
-        }
 
-      }
+			/*
+			 * デバッグ
+			 */
+			debug: true,
 
-    );
 
+			/*
+			 * -------------------------------------------------
+			 * COPC読み込み完了
+			 * -------------------------------------------------
+			 */
 
-  console.log(
-    "LAS loaded"
-  );
+			onInitialized: ({ bounds }) => {
 
+				console.log(
+					"COPC initialized",
+					bounds
+				)
 
-  console.log(
-    data
-  );
 
+				/*
+				 * COPCの中心へ移動
+				 */
 
-  /*
-   * ==========================================================
-   * POSITION
-   * ==========================================================
-   */
+				map.flyTo({
 
-  const positionAttribute =
+					center: [
 
-    data
-      .attributes
-      .POSITION;
+						(bounds.minx + bounds.maxx) / 2,
 
+						(bounds.miny + bounds.maxy) / 2
+					],
 
-  const positions =
+					zoom: 17
+				})
+			}
+		}
+	)
 
-    positionAttribute.value;
 
+	/*
+	 * =========================================================
+	 * Map Load
+	 * =========================================================
+	 */
 
-  /*
-   * ==========================================================
-   * COLOR_0
-   * ==========================================================
-   *
-   * colorDepth: 8 によって、
-   * loaderから取得したRGBをそのまま使用する。
-   *
-   * 以前のような
-   *
-   *   readLASRGB()
-   *   ↓
-   *   uint16
-   *   ↓
-   *   convertLASRGB16()
-   *
-   * は行わない。
-   *
-   * ==========================================================
-   */
+	map.on("load", () => {
 
-  const colorAttribute =
+		map.addLayer(copcLayer)
 
-    data
-      .attributes
-      .COLOR_0;
-
-
-  console.log(
-    "COLOR_0:",
-    colorAttribute
-  );
-
-
-  console.log(
-    "COLOR_0 size:",
-    colorAttribute?.size
-  );
-
-
-  console.log(
-    "COLOR_0 type:",
-    colorAttribute?.value?.constructor?.name
-  );
-
-
-  if (
-    colorAttribute?.value
-  ) {
-
-    console.log(
-
-      "COLOR_0 first values:",
-
-      Array.from(
-
-        colorAttribute.value.slice(
-
-          0,
-          12
-
-        )
-
-      )
-
-    );
-
-  }
-
-
-  /*
-   * ==========================================================
-   * Point数
-   * ==========================================================
-   */
-
-  const pointCount =
-
-    data
-      .header
-      .vertexCount;
-
-
-  console.log(
-
-    "Point count:",
-
-    pointCount
-
-  );
-
-
-  /*
-   * ==========================================================
-   * PointCloudデータ
-   * ==========================================================
-   */
-
-  const points =
-
-    new Array(
-      pointCount
-    );
-
-
-  /*
-   * ==========================================================
-   * 座標・RGB
-   * ==========================================================
-   */
-
-  for (
-
-    let i = 0;
-
-    i < pointCount;
-
-    i++
-
-  ) {
-
-
-    /*
-     * ========================================================
-     * LAS座標
-     * ========================================================
-     */
-
-    const x =
-
-      positions[
-        i * 3
-      ];
-
-
-    const y =
-
-      positions[
-        i * 3 + 1
-      ];
-
-
-    const z =
-
-      positions[
-        i * 3 + 2
-      ];
-
-
-    /*
-     * ========================================================
-     * WGS84
-     * ========================================================
-     */
-
-    const position =
-
-      convertCoordinate(
-
-        x,
-        y,
-        z
-
-      );
-
-
-    /*
-     * ========================================================
-     * RGB
-     * ========================================================
-     *
-     * loaders.glが8bit化したCOLOR_0をそのまま使用。
-     *
-     * ========================================================
-     */
-
-    const color = [
-
-      colorAttribute.value[
-        i * 3
-      ],
-
-      colorAttribute.value[
-        i * 3 + 1
-      ],
-
-      colorAttribute.value[
-        i * 3 + 2
-      ]
-
-    ];
-
-
-    /*
-     * ========================================================
-     * 最初の点を確認
-     * ========================================================
-     */
-
-    if (
-      i === 0
-    ) {
-
-      console.log(
-
-        "First loader RGB:",
-
-        color
-
-      );
-
-
-      console.log(
-
-        "First position:",
-
-        position
-
-      );
-
-    }
-
-
-    /*
-     * ========================================================
-     * Point
-     * ========================================================
-     */
-
-    points[i] = {
-
-      position,
-
-      color
-
-    };
-
-  }
-
-
-  /*
-   * ==========================================================
-   * 最終確認
-   * ==========================================================
-   */
-
-  console.log(
-
-    "First converted point:",
-
-    points[0]
-
-  );
-
-
-  return points;
-
-}
-
-
-/*
- * ============================================================
- * MapLibre
- * ============================================================
- *
- * Background
- *
- *   GSI seamlessphoto
- *
- * Terrain
- *
- *   AIST Integrated Land DEM
- *
- * ============================================================
- */
-
-const map =
-
-  new maplibregl.Map({
-
-    container:
-      "map",
-
-
-    /*
-     * ========================================================
-     * Style
-     * ========================================================
-     */
-
-    style: {
-
-      version: 8,
-
-
-      /*
-       * ======================================================
-       * Sources
-       * ======================================================
-       */
-
-      sources: {
-
-
-        /*
-         * ----------------------------------------------------
-         * GSI シームレス空中写真
-         * ----------------------------------------------------
-         */
-
-        "gsi-photo": {
-
-          type:
-            "raster",
-
-          tiles: [
-
-            "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg"
-
-          ],
-
-          tileSize:
-            256,
-
-          attribution:
-            "国土地理院"
-
-        },
-
-
-        /*
-         * ----------------------------------------------------
-         * 産総研 陸地統合DEM
-         * ----------------------------------------------------
-         */
-
-        "terrain": {
-
-          type:
-            "raster-dem",
-
-          tiles: [
-
-            "https://gbank.gsj.jp/seamless/elev/terrainRGB/land/{z}/{y}/{x}.png"
-
-          ],
-
-          tileSize:
-            256,
-
-          encoding:
-            "mapbox",
-
-          attribution:
-
-            "<a href=\"https://tiles.gsj.jp/tiles/elev/tiles.html\" target=\"_blank\">" +
-
-            "産総研 陸地統合DEM" +
-
-            "</a>"
-
-        }
-
-      },
-
-
-      /*
-       * ======================================================
-       * Layers
-       * ======================================================
-       */
-
-      layers: [
-
-        {
-
-          id:
-            "gsi-photo",
-
-          type:
-            "raster",
-
-          source:
-            "gsi-photo",
-
-          paint: {
-
-            "raster-opacity":
-              1
-
-          }
-
-        }
-
-      ],
-
-
-      /*
-       * ======================================================
-       * Terrain
-       * ======================================================
-       */
-
-      terrain: {
-
-        source:
-          "terrain",
-
-        exaggeration:
-          1
-
-      }
-
-    },
-
-
-    /*
-     * ========================================================
-     * 初期位置
-     * ========================================================
-     */
-
-    center: [
-
-      CENTER.longitude,
-
-      CENTER.latitude
-
-    ],
-
-
-    zoom:
-      INITIAL_ZOOM,
-
-
-    pitch:
-      60,
-
-
-    bearing:
-      0
-
-  });
-
-
-/*
- * ============================================================
- * Navigation Control
- * ============================================================
- */
-
-map.addControl(
-
-  new maplibregl.NavigationControl(),
-
-  "top-right"
-
-);
-
-
-/*
- * ============================================================
- * MapLibre Load
- * ============================================================
- */
-
-map.on(
-
-  "load",
-
-  async () => {
-
-    try {
-
-
-      console.log(
-        "MapLibre loaded"
-      );
-
-
-      console.log(
-        "AIST terrain enabled"
-      );
-
-
-      /*
-       * ======================================================
-       * LAS
-       * ======================================================
-       */
-
-      const points =
-
-        await loadLAS();
-
-
-      /*
-       * ======================================================
-       * PointCloudLayer
-       * ======================================================
-       */
-
-      const pointCloudLayer =
-
-        new deck.PointCloudLayer({
-
-          id:
-            "las-point-cloud",
-
-
-          /*
-           * ==================================================
-           * データ
-           * ==================================================
-           */
-
-          data:
-            points,
-
-
-          /*
-           * ==================================================
-           * 座標
-           * ==================================================
-           */
-
-          getPosition:
-
-            d => d.position,
-
-
-          /*
-           * ==================================================
-           * RGB
-           * ==================================================
-           */
-
-          getColor:
-
-            d => d.color,
-
-
-          /*
-           * ==================================================
-           * 法線
-           * ==================================================
-           */
-
-          getNormal:
-            [0, 0, 1],
-
-
-          /*
-           * ==================================================
-           * 点サイズ
-           * ==================================================
-           */
-
-          pointSize:
-            2,
-
-
-          /*
-           * ==================================================
-           * 選択
-           * ==================================================
-           */
-
-          pickable:
-            true,
-
-
-          /*
-           * ==================================================
-           * Tooltip
-           * ==================================================
-           */
-
-          getTooltip:
-
-            ({ object }) => {
-
-              if (!object) {
-
-                return null;
-
-              }
-
-
-              return {
-
-                text:
-
-                  `経度: ${
-                    object.position[0].toFixed(7)
-                  }\n` +
-
-                  `緯度: ${
-                    object.position[1].toFixed(7)
-                  }\n` +
-
-                  `標高: ${
-                    object.position[2].toFixed(2)
-                  } m`
-
-              };
-
-            }
-
-        });
-
-
-      /*
-       * ======================================================
-       * deck.gl Overlay
-       * ======================================================
-       */
-
-      const overlay =
-
-        new deck.MapboxOverlay({
-
-          interleaved:
-            true,
-
-          layers: [
-
-            pointCloudLayer
-
-          ]
-
-        });
-
-
-      /*
-       * ======================================================
-       * MapLibreへ追加
-       * ======================================================
-       */
-
-      map.addControl(
-        overlay
-      );
-
-
-      console.log(
-        "deck.gl overlay added"
-      );
-
-
-    } catch (error) {
-
-      console.error(
-        "LAS viewer error:",
-        error
-      );
-
-    }
-
-  }
-
-);
+	})
 
 </script>
 
 </body>
-
 </html>
